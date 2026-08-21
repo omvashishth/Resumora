@@ -1,0 +1,157 @@
+/* ==========================================================================
+   Resumora Universal Design System Tokens
+   Light Mode ("Gallery White") & Dark Mode ("Exhibit Noir")
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  /* Surface & Background Hierarchy */
+  --color-background: #ffffff;
+  --color-surface: #fafafa;
+  --color-surface-raised: #f4f4f5;
+  --color-surface-sunken: #e4e4e7;
+  --color-surface-hover: #f4f4f5;
+  --color-surface-active: #e4e4e7;
+  --color-surface-pure: #ffffff;
+
+  /* Typography & Contrast Colors */
+  --color-text-primary: #111111;
+  --color-text-secondary: #52525b; /* zinc-600 */
+  --color-text-tertiary: #71717a; /* zinc-500 */
+  --color-text-disabled: #a1a1aa;
+  --color-text-inverse: #ffffff;
+
+  /* Editorial Fine Rules & Borders */
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-border-subtle: rgba(0, 0, 0, 0.05);
+  --color-border-strong: rgba(0, 0, 0, 0.2);
+  --color-border-focus: #f07830;
+
+  /* Brand Identity Colors */
+  --color-brand: #111111;
+  --color-brand-hover: #27272a;
+  --color-brand-active: #000000;
+  --color-brand-subtle: rgba(0, 0, 0, 0.05);
+
+  /* Accent Colors (Follow.art Orange) */
+  --color-accent: #f07830;
+  --color-accent-hover: #e06c28;
+  --color-accent-active: #cc5c1e;
+  --color-accent-subtle: rgba(240, 120, 48, 0.1);
+
+  --color-accent-secondary: #f0d8c0;
+  --color-accent-secondary-hover: #e6ceb6;
+  --color-accent-secondary-subtle: rgba(240, 216, 192, 0.3);
+
+  /* Semantic Status Colors (High Contrast) */
+  --color-success: #1E4D3B;
+  --color-success-subtle: #D8EADF;
+  --color-warning: #874E11;
+  --color-warning-subtle: #F7E8D3;
+  --color-danger: #8C2E2E;
+  --color-danger-subtle: #F7D8D8;
+  --color-info: #224D63;
+  --color-info-subtle: #D5E7F2;
+
+  /* Overlay & Shadows */
+  --color-overlay: rgba(255, 255, 255, 0.8);
+  --shadow-paper: 0 12px 32px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 24px 60px rgba(0, 0, 0, 0.15);
+  --shadow-modal: 0 40px 80px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] {
+  /* Surface & Background Hierarchy */
+  --color-background: #09090b; /* zinc-950 */
+  --color-surface: #18181b; /* zinc-900 */
+  --color-surface-raised: #27272a; /* zinc-800 */
+  --color-surface-sunken: #000000;
+  --color-surface-hover: #27272a;
+  --color-surface-active: #3f3f46; /* zinc-700 */
+  --color-surface-pure: #09090b;
+
+  /* Typography & Contrast Colors */
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #a1a1aa; /* zinc-400 */
+  --color-text-tertiary: #71717a; /* zinc-500 */
+  --color-text-disabled: #52525b;
+  --color-text-inverse: #111111;
+
+  /* Editorial Fine Rules & Borders */
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
+  --color-border-strong: rgba(255, 255, 255, 0.2);
+  --color-border-focus: #f07830;
+
+  /* Brand Identity Colors */
+  --color-brand: #ffffff;
+  --color-brand-hover: #f4f4f5;
+  --color-brand-active: #e4e4e7;
+  --color-brand-subtle: rgba(255, 255, 255, 0.1);
+
+  /* Accent Colors */
+  --color-accent: #f07830;
+  --color-accent-hover: #fa8f4d;
+  --color-accent-active: #ff9e61;
+  --color-accent-subtle: rgba(240, 120, 48, 0.15);
+
+  --color-accent-secondary: #f0d8c0;
+  --color-accent-secondary-hover: #fcf1e6;
+  --color-accent-secondary-subtle: rgba(240, 216, 192, 0.1);
+
+  /* Semantic Status Colors (Dark Contrast) */
+  --color-success: #4E9A7B;
+  --color-success-subtle: rgba(78, 154, 123, 0.2);
+  --color-warning: #D49B4B;
+  --color-warning-subtle: rgba(212, 155, 75, 0.2);
+  --color-danger: #D96B6B;
+  --color-danger-subtle: rgba(217, 107, 107, 0.2);
+  --color-info: #5B9BC0;
+  --color-info-subtle: rgba(91, 155, 192, 0.2);
+
+  /* Overlay & Shadows */
+  --color-overlay: rgba(0, 0, 0, 0.8);
+  --shadow-paper: 0 16px 40px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-elevated: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 40px 80px rgba(0, 0, 0, 0.8);
+}
+
+:root {
+  /* Typography Scale */
+  --font-serif: "Hardbop", "Playfair Display", "Merriweather", Georgia, serif;
+  --font-sans: "HeadingNow", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Fira Code', monospace;
+
+  /* Restrained Radii Scale */
+  --radius-sharp: 0px;
+  --radius-subtle: 4px;
+  --radius-medium: 8px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-luxury: 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Animations */
+@keyframes float1 {
+  0% { transform: translateY(0) rotate(-2deg); }
+  100% { transform: translateY(-15px) rotate(-1deg); }
+}
+@keyframes float2 {
+  0% { transform: translateY(0) rotate(2deg); }
+  100% { transform: translateY(-12px) rotate(1deg); }
+}
+@keyframes float3 {
+  0% { transform: translateY(0) rotate(-4deg); }
+  100% { transform: translateY(-18px) rotate(-3deg); }
+}
+@keyframes float4 {
+  0% { transform: translateY(0) rotate(4deg); }
+  100% { transform: translateY(-10px) rotate(3deg); }
+}
+
+.anim-float-1 { animation: float1 7s ease-in-out infinite alternate; }
+.anim-float-2 { animation: float2 8s ease-in-out 1s infinite alternate; }
+.anim-float-3 { animation: float3 9s ease-in-out 2s infinite alternate; }
+.anim-float-4 { animation: float4 7.5s ease-in-out 1.5s infinite alternate; }
