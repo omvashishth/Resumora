@@ -1,6 +1,7 @@
 import React from 'react';
 import { Shield, Lock, HardDrive } from 'lucide-react';
 import { Badge } from '../ui/Badge';
+import { ResumoraLogo } from './ResumoraLogo';
 
 export const Footer: React.FC = () => {
   return (
@@ -8,6 +9,7 @@ export const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         <div>
           <div className="flex items-center gap-2 font-serif font-bold text-[var(--color-text-primary)] text-base mb-2">
+            <ResumoraLogo size="xs" strokeWidth={3.0} />
             <span>Resumora</span>
             <Badge variant="success">Local-First Studio</Badge>
           </div>

@@ -8,6 +8,7 @@ import type { Resume, TemplateId } from '../types/resume';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { createSampleResume } from '../utils/sampleData';
 import { ThemeToggle } from '../components/landing/ThemeToggle';
+import { ResumoraLogo } from '../components/common/ResumoraLogo';
 import { Menu, X, ArrowRight, ShieldCheck, CheckCircle2, Zap, Flame } from 'lucide-react';
 
 interface LandingProps {
@@ -286,9 +287,12 @@ export const Landing: React.FC<LandingProps> = ({ onNavigate, onCreateNew, onSel
 
       {/* FIXED GLOBAL HEADER */}
       <header className="fixed top-0 left-0 right-0 z-50 p-5 md:p-8 flex items-start justify-between pointer-events-none">
-        <div className="flex flex-col pointer-events-auto text-white">
-          <span className="text-[22px] md:text-[26px] font-['Bebas_Neue'] uppercase leading-none tracking-wide">RESUMORA.</span>
-          <span className="text-[11px] md:text-[12px] font-medium opacity-90 tracking-wider">One Resume. One Career.</span>
+        <div className="flex items-center gap-3 pointer-events-auto text-white">
+          <ResumoraLogo size="sm" strokeWidth={2.8} className="text-white shrink-0" />
+          <div className="flex flex-col">
+            <span className="text-[22px] md:text-[26px] font-['Bebas_Neue'] uppercase leading-none tracking-wide">RESUMORA.</span>
+            <span className="text-[11px] md:text-[12px] font-medium opacity-90 tracking-wider">One Resume. One Career.</span>
+          </div>
         </div>
 
         <nav className="hidden lg:flex items-center gap-7 pointer-events-auto text-white text-[13px] font-medium tracking-wide">
@@ -325,7 +329,10 @@ export const Landing: React.FC<LandingProps> = ({ onNavigate, onCreateNew, onSel
           >
             <div>
               <div className="flex justify-between items-center h-[50px] mb-8 pb-4 border-b border-white/10">
-                <span className="text-2xl font-['Bebas_Neue'] tracking-wider">RESUMORA.</span>
+                <div className="flex items-center gap-2.5">
+                  <ResumoraLogo size="sm" strokeWidth={2.8} className="text-white shrink-0" />
+                  <span className="text-2xl font-['Bebas_Neue'] tracking-wider">RESUMORA.</span>
+                </div>
                 <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-white/80 hover:text-white">
                   <X size={24} />
                 </button>

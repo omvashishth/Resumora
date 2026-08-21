@@ -20,6 +20,7 @@ import { themeController, ThemeMode, ActiveTheme } from '../../utils/themeContro
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { StatusIndicator, StatusType } from '../ui/StatusIndicator';
+import { ResumoraLogo } from './ResumoraLogo';
 
 interface HeaderProps {
   currentView: 'landing' | 'dashboard' | 'builder';
@@ -89,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center gap-2 sm:gap-2.5 text-left group focus:outline-hidden cursor-pointer shrink-0"
         >
           <div className="w-7 h-7 rounded-[var(--radius-subtle)] bg-[var(--color-brand)] flex items-center justify-center text-[var(--color-text-inverse)] shadow-xs group-hover:bg-[var(--color-brand-hover)] transition-colors duration-150 shrink-0">
-            <FileText className="w-4 h-4" />
+            <ResumoraLogo size="xs" strokeWidth={3.2} />
           </div>
           <div>
             <span className="font-serif font-bold text-sm sm:text-base tracking-tight text-[var(--color-text-primary)]">
