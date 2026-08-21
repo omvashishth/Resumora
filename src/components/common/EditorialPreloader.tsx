@@ -5,62 +5,34 @@ interface EditorialPreloaderProps {
   onComplete: () => void;
 }
 
-const STEPS = [
-  'COMPILING VECTOR RENDER ENGINE',
-  'SYNCHRONIZING EDITORIAL TYPOGRAPHY',
-  'INITIALIZING CLIENT-SIDE DATABASE',
-  'ATS SIGNAL PROCESSOR READY',
-];
-
 export const EditorialPreloader: React.FC<EditorialPreloaderProps> = ({ onComplete }) => {
-  const [progress, setProgress] = useState(0);
-  const [stepIndex, setStepIndex] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
 
   useEffect(() => {
-    let currentProgress = 0;
-    let stepTimer: number;
+    let exitTimer: number;
 
-    // Preload web fonts
-    const preloadAssets = async () => {
+    const initPreload = async () => {
       try {
         if ('fonts' in document) {
           await (document as Document & { fonts: FontFaceSet }).fonts.ready;
         }
       } catch (e) {
-        console.warn('Font preload completed with fallback:', e);
+        console.warn('Font preload fallback:', e);
       }
+
+      // Calm, minimal dwell time (1.9s)
+      exitTimer = window.setTimeout(() => {
+        setIsFinished(true);
+        window.setTimeout(() => {
+          onComplete();
+        }, 700);
+      }, 1900);
     };
 
-    preloadAssets();
-
-    // Smooth deterministic progress increment
-    const interval = window.setInterval(() => {
-      currentProgress += Math.floor(Math.random() * 8) + 4;
-      if (currentProgress >= 100) {
-        currentProgress = 100;
-        setProgress(100);
-        setStepIndex(3);
-        clearInterval(interval);
-
-        // Hold 100% briefly for polish then trigger exit
-        stepTimer = window.setTimeout(() => {
-          setIsFinished(true);
-          window.setTimeout(() => {
-            onComplete();
-          }, 600);
-        }, 350);
-      } else {
-        setProgress(currentProgress);
-        if (currentProgress > 75) setStepIndex(3);
-        else if (currentProgress > 50) setStepIndex(2);
-        else if (currentProgress > 25) setStepIndex(1);
-      }
-    }, 45);
+    initPreload();
 
     return () => {
-      clearInterval(interval);
-      clearTimeout(stepTimer);
+      clearTimeout(exitTimer);
     };
   }, [onComplete]);
 
@@ -68,81 +40,94 @@ export const EditorialPreloader: React.FC<EditorialPreloaderProps> = ({ onComple
     <AnimatePresence>
       {!isFinished && (
         <motion.div
-          key="preloader-overlay"
+          key="resumora-preloader"
           initial={{ opacity: 1 }}
           exit={{
-            y: '-100%',
-            transition: { duration: 0.7, ease: [0.76, 0, 0.24, 1] },
+            opacity: 0,
+            scale: 1.02,
+            transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] },
           }}
-          className="fixed inset-0 z-[9999] bg-[#0A0A0B] text-white flex flex-col justify-between p-6 sm:p-10 select-none overflow-hidden"
+          className="fixed inset-0 z-[9999] bg-[#09090b] text-[#f4f4f6] flex items-center justify-center select-none overflow-hidden"
+          style={{ willChange: 'opacity, transform' }}
         >
-          {/* Ambient Subtle Glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-[#F15A24]/10 rounded-full blur-3xl pointer-events-none" />
+          {/* Subtle Ambient Radial Glow */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{
+              opacity: [0.08, 0.16, 0.08],
+              scale: [0.94, 1.06, 0.94],
+            }}
+            transition={{
+              duration: 3.8,
+              repeat: Infinity,
+              ease: 'easeInOut',
+            }}
+            className="absolute w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-[#f07830]/15 blur-[100px] pointer-events-none"
+          />
 
-          {/* Top Architectural Metadata */}
-          <div className="flex justify-between items-center text-[10px] sm:text-xs font-mono tracking-widest text-zinc-400 uppercase z-10">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#F15A24] animate-pulse" />
-              <span className="font-bold text-white">RESUMORA</span>
-              <span className="hidden sm:inline text-zinc-600">//</span>
-              <span className="hidden sm:inline">STUDIO SYSTEM 2.0</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="hidden sm:inline text-zinc-500">EDITION // 2026</span>
-              <span className="text-[#F15A24] font-bold">100% VECTOR</span>
-            </div>
-          </div>
-
-          {/* Center Main Stage */}
-          <div className="flex flex-col items-center justify-center my-auto z-10 w-full max-w-xl mx-auto text-center px-4">
-            {/* Minimalist Watermark Monogram */}
+          {/* Centered Minimal Organic Aesthetic Glyph */}
+          <div className="relative flex flex-col items-center justify-center">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8 }}
-              className="text-[72px] sm:text-[110px] md:text-[130px] font-['Bebas_Neue'] leading-none tracking-tight text-white/90 drop-shadow-2xl"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{
+                scale: [0.96, 1.04, 0.97, 1.02, 0.96],
+                rotate: [0, 1.5, -1.2, 0.6, 0],
+                opacity: 1,
+              }}
+              transition={{
+                scale: {
+                  duration: 3.8,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                },
+                rotate: {
+                  duration: 5.5,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                },
+                opacity: {
+                  duration: 0.6,
+                  ease: 'easeOut',
+                },
+              }}
+              className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center text-[#f4f4f6]"
             >
-              RESUMORA
+              <svg
+                viewBox="0 0 100 100"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-full h-full overflow-visible drop-shadow-[0_0_16px_rgba(244,244,246,0.18)]"
+              >
+                {/* Organic fluid handcrafted contour line */}
+                <motion.path
+                  d="M 50,14
+                     C 59,14 65,24 64,33
+                     C 64,41 84,27 86,39
+                     C 88,51 77,57 70,58
+                     C 63,59 78,74 71,81
+                     C 64,88 56,71 49,70
+                     C 42,71 33,87 27,80
+                     C 21,73 35,59 29,57
+                     C 22,55 14,48 14,37
+                     C 14,26 36,39 36,31
+                     C 36,23 41,14 50,14
+                     Z"
+                  stroke="currentColor"
+                  strokeWidth="2.3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{
+                    pathLength: 1,
+                    opacity: 1,
+                  }}
+                  transition={{
+                    pathLength: { duration: 1.1, ease: [0.22, 1, 0.36, 1] },
+                    opacity: { duration: 0.3 },
+                  }}
+                />
+              </svg>
             </motion.div>
-
-            {/* Micro Subtitle */}
-            <p className="text-xs sm:text-sm font-serif italic text-zinc-400 -mt-2 sm:-mt-3 mb-8">
-              Curate your career with Swiss typography & zero latency.
-            </p>
-
-            {/* Hairline Progress Bar */}
-            <div className="w-full h-[2px] bg-zinc-800 rounded-full overflow-hidden mb-5 relative">
-              <motion.div
-                className="h-full bg-[#F15A24]"
-                style={{ width: `${progress}%` }}
-                transition={{ ease: 'easeOut', duration: 0.1 }}
-              />
-            </div>
-
-            {/* Progress Status & Live Percentage */}
-            <div className="w-full flex items-center justify-between font-mono text-[11px] sm:text-xs text-zinc-400">
-              <div className="flex items-center gap-2 text-left">
-                <span className="text-[#F15A24] font-bold">
-                  [{String(stepIndex + 1).padStart(2, '0')}/04]
-                </span>
-                <span className="tracking-wider truncate max-w-[200px] sm:max-w-none text-zinc-300">
-                  {STEPS[stepIndex]}
-                </span>
-              </div>
-              <span className="font-bold text-white font-mono text-xs sm:text-sm">
-                {String(progress).padStart(3, '0')}%
-              </span>
-            </div>
-          </div>
-
-          {/* Bottom Coordinates & Architecture */}
-          <div className="flex justify-between items-end text-[10px] sm:text-xs font-mono text-zinc-500 tracking-wider uppercase z-10 border-t border-zinc-800/80 pt-4">
-            <div>
-              <span className="text-zinc-400">LATENCY:</span> 0.0MS · CLIENT-FIRST
-            </div>
-            <div>
-              <span className="text-zinc-400">STATUS:</span> BOOTING ENGINE
-            </div>
           </div>
         </motion.div>
       )}
