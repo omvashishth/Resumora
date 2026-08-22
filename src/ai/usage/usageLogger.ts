@@ -42,6 +42,7 @@ export function sanitizeSecretString(text?: string): string | undefined {
 export class LocalUsageLogger implements IAIUsageLogger {
   private readonly storageKey = 'cvforge_ai_usage_history';
   private readonly maxRecords = 50;
+  private inMemoryLogs: AIUsageRecord[] = [];
 
   public async logUsage(record: Omit<AIUsageRecord, 'id' | 'timestamp'>): Promise<void> {
     const sanitizedError = sanitizeSecretString(record.errorMessage);
@@ -54,29 +55,34 @@ export class LocalUsageLogger implements IAIUsageLogger {
     };
 
     try {
-      const history = await this.getUsageHistory();
-      history.unshift(fullRecord);
-      const trimmed = history.slice(0, this.maxRecords);
+      this.inMemoryLogs.unshift(fullRecord);
+      this.inMemoryLogs = this.inMemoryLogs.slice(0, this.maxRecords);
+
       if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(this.storageKey, JSON.stringify(trimmed));
+        window.localStorage.setItem(this.storageKey, JSON.stringify(this.inMemoryLogs));
       }
     } catch (err) {
       console.warn('Failed to log AI usage:', err);
     }
   }
 
-  public async getUsageHistory(): Promise<AIUsageRecord[]> {
+  public async getUsageHistory(limit?: number): Promise<AIUsageRecord[]> {
     try {
-      if (typeof window === 'undefined' || !window.localStorage) return [];
-      const raw = window.localStorage.getItem(this.storageKey);
-      if (!raw) return [];
-      return JSON.parse(raw);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const raw = window.localStorage.getItem(this.storageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return limit ? parsed.slice(0, limit) : parsed;
+        }
+      }
+      return limit ? this.inMemoryLogs.slice(0, limit) : this.inMemoryLogs;
     } catch {
-      return [];
+      return limit ? this.inMemoryLogs.slice(0, limit) : this.inMemoryLogs;
     }
   }
 
   public async clearHistory(): Promise<void> {
+    this.inMemoryLogs = [];
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.removeItem(this.storageKey);

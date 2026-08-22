@@ -6,6 +6,7 @@ import {
   renameResume,
   ensureInitialSeed,
   getAllResumes,
+  saveResume,
 } from '../storage/resumeRepository';
 import { Header } from '../components/common/Header';
 import { Footer } from '../components/common/Footer';
@@ -19,6 +20,8 @@ import { importResumeFile } from '../services/importService';
 import type { ImportParseResult } from '../services/resumeParser';
 import { triggerResumeSync, performFullTwoWaySync, subscribeSyncStatus } from '../services/syncManager';
 import { getCurrentUser } from '../services/authService';
+import { exportLimitManager } from '../services/exportLimitManager';
+import { PaywallModal, PaywallTriggerReason } from '../components/pricing/PaywallModal';
 import {
   Plus,
   Edit,
@@ -51,6 +54,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectResume
   const [renameModalItem, setRenameModalItem] = useState<{ id: string; title: string } | null>(null);
   const [newTitleInput, setNewTitleInput] = useState('');
   const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallReason, setPaywallReason] = useState<PaywallTriggerReason>('export_limit');
 
   // Import state
   const [importing, setImporting] = useState(false);
@@ -133,6 +138,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectResume
   };
 
   const handleDownloadPdf = async (resume: Resume) => {
+    if (!exportLimitManager.canExport()) {
+      setPaywallReason('export_limit');
+      setPaywallOpen(true);
+      return;
+    }
+
     try {
       const blob = await exportResumeToPdf(resume);
       const url = URL.createObjectURL(blob);
@@ -141,12 +152,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectResume
       a.download = `${resume.personal.fullName || resume.title || 'Resume'}.pdf`.replace(/\s+/g, '_');
       a.click();
       URL.revokeObjectURL(url);
+      await exportLimitManager.recordExport();
     } catch (err) {
       console.error('PDF export error:', err);
     }
   };
 
   const handleDownloadDocx = async (resume: Resume) => {
+    if (!exportLimitManager.canExport()) {
+      setPaywallReason('export_limit');
+      setPaywallOpen(true);
+      return;
+    }
+
     try {
       const blob = await exportResumeToDocx(resume);
       const url = URL.createObjectURL(blob);
@@ -155,6 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectResume
       a.download = `${resume.personal.fullName || resume.title || 'Resume'}.docx`.replace(/\s+/g, '_');
       a.click();
       URL.revokeObjectURL(url);
+      await exportLimitManager.recordExport();
     } catch (err) {
       console.error('DOCX export error:', err);
     }
@@ -164,14 +183,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectResume
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Security Validation: Enforce 5MB limit and strict MIME types
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Security Error: File exceeds the maximum allowed size of 5MB.");
+    if (file.size > 15 * 1024 * 1024) {
+      alert("File exceeds the maximum allowed size of 15MB.");
+      e.target.value = '';
       return;
     }
-    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!validTypes.includes(file.type) && !file.name.endsWith('.pdf') && !file.name.endsWith('.docx')) {
-      alert("Security Error: Unrecognized or malicious file signature detected.");
+
+    const fileNameLower = file.name.toLowerCase();
+    const isAllowed =
+      fileNameLower.endsWith('.pdf') ||
+      fileNameLower.endsWith('.docx') ||
+      fileNameLower.endsWith('.json') ||
+      file.type === 'application/pdf' ||
+      file.type.includes('wordprocessingml') ||
+      file.type.includes('msword') ||
+      file.type === 'application/json';
+
+    if (!isAllowed) {
+      alert("Unsupported file format. Please upload a PDF, DOCX, or JSON document.");
+      e.target.value = '';
       return;
     }
 
@@ -184,11 +214,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectResume
       console.error('Import error:', err);
     } finally {
       setImporting(false);
+      e.target.value = '';
     }
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = async () => {
     if (parseResult?.resume) {
+      try {
+        await saveResume(parseResult.resume);
+        triggerResumeSync(parseResult.resume.id, 'upsert');
+      } catch (e) {
+        console.warn('Could not immediately save imported resume to storage:', e);
+      }
       onSelectResume(parseResult.resume);
       setImportReviewOpen(false);
       onNavigate('builder', parseResult.resume.id);
@@ -201,6 +238,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectResume
         currentView="dashboard"
         onNavigate={onNavigate}
         onOpenAccountModal={() => setAccountModalOpen(true)}
+        onOpenPaywallModal={() => {
+          setPaywallReason('export_limit');
+          setPaywallOpen(true);
+        }}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-1 w-full">
@@ -224,7 +265,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectResume
               <span>{importing ? 'Extracting...' : 'Import Resume'}</span>
               <input
                 type="file"
-                accept=".pdf,.docx"
+                accept=".pdf,.docx,.json"
                 onChange={handleFileUpload}
                 className="hidden"
                 disabled={importing}
@@ -453,7 +494,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onSelectResume
       />
 
       {/* Account Settings Modal */}
-      <AccountModal isOpen={accountModalOpen} onClose={() => setAccountModalOpen(false)} />
+      <AccountModal
+        isOpen={accountModalOpen}
+        onClose={() => setAccountModalOpen(false)}
+        onOpenPaywallModal={() => {
+          setPaywallReason('export_limit');
+          setPaywallOpen(true);
+        }}
+      />
+
+      {/* Paywall & Pricing Modal */}
+      <PaywallModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        triggerReason={paywallReason}
+        onPaymentSuccess={(msg) => {
+          alert(`🎉 ${msg}`);
+        }}
+      />
 
       <Footer />
     </div>

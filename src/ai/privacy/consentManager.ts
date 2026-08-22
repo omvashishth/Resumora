@@ -9,17 +9,20 @@ export type ConsentChangeListener = (hasConsent: boolean) => void;
 
 class ConsentManager {
   private listeners: Set<ConsentChangeListener> = new Set();
+  private inMemoryConsent = false;
 
   /**
    * Check if user has granted consent for AI data processing.
    * Default is false (strict local-first privacy).
    */
   public hasAIConsent(): boolean {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return this.inMemoryConsent;
+    }
     try {
-      if (typeof window === 'undefined' || !window.localStorage) return false;
       return window.localStorage.getItem(AI_CONSENT_KEY) === 'true';
     } catch {
-      return false;
+      return this.inMemoryConsent;
     }
   }
 
@@ -27,28 +30,30 @@ class ConsentManager {
    * Explicitly grant user consent for AI services.
    */
   public grantAIConsent(): void {
+    this.inMemoryConsent = true;
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem(AI_CONSENT_KEY, 'true');
-        this.notifyListeners(true);
       }
     } catch (err) {
       console.warn('Unable to persist AI consent state:', err);
     }
+    this.notifyListeners(true);
   }
 
   /**
    * Revoke user consent for AI services.
    */
   public revokeAIConsent(): void {
+    this.inMemoryConsent = false;
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.removeItem(AI_CONSENT_KEY);
-        this.notifyListeners(false);
       }
     } catch (err) {
       console.warn('Unable to clear AI consent state:', err);
     }
+    this.notifyListeners(false);
   }
 
   /**

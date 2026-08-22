@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Resume, SectionKey } from '../types/resume';
 import { useResume } from '../hooks/useResume';
 import { Header } from '../components/common/Header';
@@ -18,10 +18,15 @@ import { CustomizationPanel } from '../components/editor/CustomizationPanel';
 import { ResumePreview } from '../components/preview/ResumePreview';
 import { TemplateSelectorModal } from '../components/preview/TemplateSelectorModal';
 import { AccountModal } from '../components/common/AccountModal';
+import { ATSScorecardModal } from '../components/ats/ATSScorecardModal';
+import { analyzeResumeATS } from '../utils/atsScoreEngine';
 import { exportResumeToPdf } from '../services/pdfService';
 import { exportResumeToDocx } from '../services/docxService';
 import { triggerResumeSync } from '../services/syncManager';
-import { Eye, Edit3, ArrowLeft, Camera } from 'lucide-react';
+import { exportLimitManager } from '../services/exportLimitManager';
+import { stripeService } from '../services/stripeService';
+import { PaywallModal, PaywallTriggerReason } from '../components/pricing/PaywallModal';
+import { Eye, Edit3, ArrowLeft, Camera, Sparkles, Crown } from 'lucide-react';
 import { LoadingOverlay } from '../components/common/LoadingOverlay';
 import { getTemplateById } from '../templates/TemplateRenderer';
 
@@ -70,11 +75,38 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialResume, onN
   } = useResume(initialResume);
 
   const [activeSection, setActiveSection] = useState<SectionKey | 'customization'>('personal');
+  const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [accountModalTab, setAccountModalTab] = useState<'account' | 'ai'>('account');
-  const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
-  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+  const [atsModalOpen, setAtsModalOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallReason, setPaywallReason] = useState<PaywallTriggerReason>('general_upgrade');
+  const [paymentSuccessToast, setPaymentSuccessToast] = useState<string | null>(null);
+
+  // Check for successful Stripe checkout return
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('payment') === 'success') {
+        const sessionId = urlParams.get('session_id') || undefined;
+        const interval = urlParams.get('interval') || 'monthly';
+        stripeService.verifyAndActivate(sessionId, interval).then((res) => {
+          if (res.success) {
+            setPaymentSuccessToast(res.message);
+            setTimeout(() => setPaymentSuccessToast(null), 6000);
+          }
+        });
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, []);
+
+  // Compute live ATS score (0ms client-side calculation)
+  const atsAnalysis = useMemo(() => {
+    return analyzeResumeATS(resume);
+  }, [resume]);
 
   // Sync state changes with cloud queue if logged in
   useEffect(() => {
@@ -84,7 +116,13 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialResume, onN
   }, [saveStatus, resume.id]);
 
   const handleDownloadPdf = async () => {
-    setLoadingMessage('Preparing PDF export...');
+    if (!exportLimitManager.canExport()) {
+      setPaywallReason('export_limit');
+      setPaywallOpen(true);
+      return;
+    }
+
+    setLoadingMessage('Rendering vector PDF...');
     try {
       const blob = await exportResumeToPdf(resume);
       const url = URL.createObjectURL(blob);
@@ -93,6 +131,7 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialResume, onN
       a.download = `${resume.personal.fullName || resume.title || 'Resume'}.pdf`.replace(/\s+/g, '_');
       a.click();
       URL.revokeObjectURL(url);
+      await exportLimitManager.recordExport();
     } catch (err) {
       console.error('Failed to export PDF:', err);
     } finally {
@@ -101,6 +140,12 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialResume, onN
   };
 
   const handleDownloadDocx = async () => {
+    if (!exportLimitManager.canExport()) {
+      setPaywallReason('export_limit');
+      setPaywallOpen(true);
+      return;
+    }
+
     setLoadingMessage('Preparing DOCX export...');
     try {
       const blob = await exportResumeToDocx(resume);
@@ -110,6 +155,7 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialResume, onN
       a.download = `${resume.personal.fullName || resume.title || 'Resume'}.docx`.replace(/\s+/g, '_');
       a.click();
       URL.revokeObjectURL(url);
+      await exportLimitManager.recordExport();
     } catch (err) {
       console.error('Failed to export DOCX:', err);
     } finally {
@@ -255,11 +301,32 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialResume, onN
         onDownloadPdf={handleDownloadPdf}
         onDownloadDocx={handleDownloadDocx}
         onChangeTemplate={() => setTemplateModalOpen(true)}
+        atsAnalysis={atsAnalysis}
+        onOpenATSModal={() => setAtsModalOpen(true)}
+        onOpenPaywallModal={() => {
+          setPaywallReason('general_upgrade');
+          setPaywallOpen(true);
+        }}
         onOpenAccountModal={() => {
           setAccountModalTab('account');
           setAccountModalOpen(true);
         }}
       />
+
+      {paymentSuccessToast && (
+        <div className="bg-[var(--color-success-subtle)] border-b border-[var(--color-success)]/40 px-4 py-2.5 flex items-center justify-between text-xs text-[var(--color-success)] font-medium z-30 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 max-w-4xl mx-auto w-full">
+            <Crown className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>{paymentSuccessToast}</span>
+          </div>
+          <button
+            onClick={() => setPaymentSuccessToast(null)}
+            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer text-xs ml-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Title Subheader */}
       <div className="bg-[var(--color-surface)] border-b border-[var(--color-border)] px-3 sm:px-4 py-2 flex items-center justify-between gap-2 shrink-0">
@@ -409,6 +476,30 @@ export const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialResume, onN
         isOpen={accountModalOpen}
         onClose={() => setAccountModalOpen(false)}
         defaultTab={accountModalTab}
+        onOpenPaywallModal={() => {
+          setPaywallReason('general_upgrade');
+          setPaywallOpen(true);
+        }}
+      />
+
+      <ATSScorecardModal
+        isOpen={atsModalOpen}
+        onClose={() => setAtsModalOpen(false)}
+        resume={resume}
+        onNavigateSection={(sec) => setActiveSection(sec)}
+        onAddSkill={(skillName, category) => addSkill(skillName, category)}
+        onOpenAISettings={openAISettings}
+      />
+
+      <PaywallModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        triggerReason={paywallReason}
+        onOpenBYOKSettings={openAISettings}
+        onPaymentSuccess={(msg) => {
+          setPaymentSuccessToast(msg);
+          setTimeout(() => setPaymentSuccessToast(null), 6000);
+        }}
       />
       {loadingMessage && <LoadingOverlay message={loadingMessage} />}
     </div>

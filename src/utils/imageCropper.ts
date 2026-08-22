@@ -87,15 +87,6 @@ export const processAndCropImage = async (
 
   ctx.drawImage(img, srcX, srcY, cropSize, cropSize, 0, 0, targetW, targetH);
 
-  // Export as WebP Data URL (falls back to PNG if WebP is unsupported)
-  try {
-    const webpUrl = canvas.toDataURL('image/webp', quality);
-    if (webpUrl.startsWith('data:image/webp')) {
-      return webpUrl;
-    }
-  } catch {
-    // Fallback to PNG
-  }
-
+  // Export as PNG (universally supported by @react-pdf/renderer and DOCX)
   return canvas.toDataURL('image/png');
 };

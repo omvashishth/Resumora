@@ -1,6 +1,8 @@
 import { getSupabaseClient } from './supabaseClient';
 import type { User, Session } from '@supabase/supabase-js';
 import { performFullTwoWaySync } from './syncManager';
+import { exportLimitManager } from './exportLimitManager';
+import { entitlementsManager } from '../ai/entitlements/entitlementsManager';
 
 export interface AuthState {
   user: User | null;
@@ -25,6 +27,10 @@ export const signInWithGoogle = async (): Promise<{ error: Error | null }> => {
 };
 
 export const signOutUser = async (): Promise<{ error: Error | null }> => {
+  // Always immediately purge client-side entitlements and Pro state on sign out
+  exportLimitManager.resetToFree();
+  entitlementsManager.resetToFree();
+
   const client = getSupabaseClient();
   if (!client) return { error: null };
   const { error } = await client.auth.signOut();
@@ -65,8 +71,16 @@ export const subscribeToAuthChanges = (callback: (state: AuthState) => void) => 
     .then(({ data }) => {
       if (!isSubscribed) return;
       const session = data?.session || null;
+      const user = session?.user || null;
+
+      // Sync entitlements strictly with backend user profile
+      exportLimitManager.syncWithBackendUser(user);
+      if (!user) {
+        entitlementsManager.resetToFree();
+      }
+
       callback({
-        user: session?.user || null,
+        user,
         session,
         isConfigured: true,
         loading: false,
@@ -74,6 +88,8 @@ export const subscribeToAuthChanges = (callback: (state: AuthState) => void) => 
     })
     .catch(() => {
       if (!isSubscribed) return;
+      exportLimitManager.resetToFree();
+      entitlementsManager.resetToFree();
       callback({
         user: null,
         session: null,
@@ -85,11 +101,20 @@ export const subscribeToAuthChanges = (callback: (state: AuthState) => void) => 
   // 2. Subscribe to auth state changes using onAuthStateChange
   const { data: listener } = client.auth.onAuthStateChange((event, session) => {
     if (!isSubscribed) return;
-    if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
+    const user = session?.user || null;
+
+    // Authoritative backend sync on all auth events
+    exportLimitManager.syncWithBackendUser(user);
+    if (!user) {
+      entitlementsManager.resetToFree();
+    }
+
+    if (user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
       performFullTwoWaySync().catch(console.error);
     }
+
     callback({
-      user: session?.user || null,
+      user,
       session: session || null,
       isConfigured: true,
       loading: false,
@@ -103,6 +128,9 @@ export const subscribeToAuthChanges = (callback: (state: AuthState) => void) => 
 };
 
 export const deleteCloudAccount = async (): Promise<{ error: Error | null }> => {
+  exportLimitManager.resetToFree();
+  entitlementsManager.resetToFree();
+
   const client = getSupabaseClient();
   if (!client) {
     return { error: new Error('Supabase is not configured.') };

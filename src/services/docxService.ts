@@ -1,6 +1,7 @@
 import { Resume } from '../types/resume';
 import { formatDateRange } from '../utils/dates';
 import { getSectionTitle } from '../utils/formatting';
+import { normalizeAvatarForExport } from '../utils/imageExportHelper';
 
 export const exportResumeToDocx = async (resume: Resume): Promise<Blob> => {
   const { Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel, AlignmentType, BorderStyle, ExternalHyperlink } = await import('docx');
@@ -13,9 +14,10 @@ export const exportResumeToDocx = async (resume: Resume): Promise<Blob> => {
   const docChildren = [];
 
   // Profile Photo Paragraph if present
-  if (personal.avatarUrl && personal.avatarUrl.includes(',')) {
+  const normalizedAvatar = await normalizeAvatarForExport(personal.avatarUrl);
+  if (normalizedAvatar && normalizedAvatar.includes(',')) {
     try {
-      const base64Data = personal.avatarUrl.split(',')[1];
+      const base64Data = normalizedAvatar.split(',')[1];
       const binaryString = atob(base64Data);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {

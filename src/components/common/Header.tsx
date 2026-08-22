@@ -21,6 +21,10 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { StatusIndicator, StatusType } from '../ui/StatusIndicator';
 import { ResumoraLogo } from './ResumoraLogo';
+import { ATSScoreBadge } from '../ats/ATSScoreBadge';
+import type { ATSAnalysisResult } from '../../utils/atsScoreEngine';
+import { exportLimitManager, ExportEntitlementStats } from '../../services/exportLimitManager';
+import { Sparkles, Crown } from 'lucide-react';
 
 interface HeaderProps {
   currentView: 'landing' | 'dashboard' | 'builder';
@@ -31,6 +35,9 @@ interface HeaderProps {
   onDownloadDocx?: () => void;
   onChangeTemplate?: () => void;
   onOpenAccountModal?: () => void;
+  atsAnalysis?: ATSAnalysisResult;
+  onOpenATSModal?: () => void;
+  onOpenPaywallModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -42,11 +49,15 @@ export const Header: React.FC<HeaderProps> = ({
   onDownloadDocx,
   onChangeTemplate,
   onOpenAccountModal,
+  atsAnalysis,
+  onOpenATSModal,
+  onOpenPaywallModal,
 }) => {
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(themeController.getMode());
   const [activeTheme, setActiveTheme] = useState<ActiveTheme>(themeController.getActiveTheme());
+  const [exportStats, setExportStats] = useState<ExportEntitlementStats>(exportLimitManager.getStats());
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     session: null,
@@ -62,10 +73,13 @@ export const Header: React.FC<HeaderProps> = ({
       setThemeMode(mode);
       setActiveTheme(active);
     });
+    const unsubExport = exportLimitManager.subscribe(setExportStats);
+
     return () => {
       unsubAuth();
       unsubSync();
       unsubTheme();
+      unsubExport();
     };
   }, []);
 
@@ -248,6 +262,10 @@ export const Header: React.FC<HeaderProps> = ({
 
           {currentView === 'builder' && (
             <>
+              {atsAnalysis && onOpenATSModal && (
+                <ATSScoreBadge analysis={atsAnalysis} onClick={onOpenATSModal} />
+              )}
+
               {onChangeTemplate && (
                 <Button
                   variant="outline"
@@ -258,6 +276,28 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <span className="hidden sm:inline">Templates</span>
                 </Button>
+              )}
+
+              {/* Upgrade or Pro Badge */}
+              {exportStats.isPro ? (
+                <div
+                  onClick={onOpenAccountModal}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-subtle)] text-[11px] font-bold text-amber-500 cursor-pointer select-none"
+                  title="Resumora Pro Active"
+                >
+                  <Crown className="w-3 h-3 text-amber-500" />
+                  <span>PRO</span>
+                </div>
+              ) : (
+                onOpenPaywallModal && (
+                  <button
+                    onClick={onOpenPaywallModal}
+                    className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-amber-500 bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-subtle)] hover:bg-amber-500/20 transition-colors duration-150 cursor-pointer shadow-xs"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Upgrade</span>
+                  </button>
+                )
               )}
 
               {/* Download Menu Dropdown */}

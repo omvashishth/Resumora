@@ -28,22 +28,28 @@ const STORAGE_KEYS = {
 
 class AIConfigManager {
   private inMemoryKeys: Map<AIProviderId, string> = new Map();
+  private inMemoryConfig: Partial<AIConfig> = {
+    mode: 'cvforge',
+    providerId: 'cvforge',
+    storageType: 'persistent',
+  };
 
   private getProviderKeyStorageName(providerId: AIProviderId): string {
     return `${STORAGE_KEYS.BYOK_PREFIX}${providerId}`;
   }
 
   public getStorageType(): CredentialStorageType {
-    if (typeof window === 'undefined') return 'persistent';
+    if (typeof window === 'undefined') return this.inMemoryConfig.storageType || 'persistent';
     try {
       const type = localStorage.getItem(STORAGE_KEYS.STORAGE_TYPE) as CredentialStorageType | null;
       return type === 'session' ? 'session' : 'persistent';
     } catch {
-      return 'persistent';
+      return this.inMemoryConfig.storageType || 'persistent';
     }
   }
 
   public setStorageType(type: CredentialStorageType): void {
+    this.inMemoryConfig.storageType = type;
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(STORAGE_KEYS.STORAGE_TYPE, type);
@@ -57,7 +63,18 @@ class AIConfigManager {
    */
   public getConfig(targetProviderId?: AIProviderId): AIConfig {
     if (typeof window === 'undefined') {
-      return { mode: 'cvforge', providerId: 'cvforge', storageType: 'persistent' };
+      const mode = this.inMemoryConfig.mode || 'cvforge';
+      const providerId = this.inMemoryConfig.providerId || 'gemini';
+      const activePid = targetProviderId || providerId;
+      const apiKey = this.getProviderKey(activePid);
+      return {
+        mode,
+        providerId,
+        apiKey,
+        proxyUrl: this.inMemoryConfig.proxyUrl,
+        model: this.inMemoryConfig.model,
+        storageType: this.inMemoryConfig.storageType || 'persistent',
+      };
     }
 
     let mode: AIProviderMode = 'cvforge';
@@ -159,6 +176,13 @@ class AIConfigManager {
    * Save configuration and provider-isolated key.
    */
   public saveConfig(config: Partial<AIConfig>): void {
+    this.inMemoryConfig = { ...this.inMemoryConfig, ...config };
+
+    const activePid = config.providerId || this.inMemoryConfig.providerId || 'gemini';
+    if (config.apiKey !== undefined && activePid) {
+      this.saveProviderKey(activePid, config.apiKey);
+    }
+
     if (typeof window === 'undefined') return;
 
     try {
@@ -172,11 +196,6 @@ class AIConfigManager {
 
       if (config.providerId) {
         localStorage.setItem(STORAGE_KEYS.PROVIDER, config.providerId);
-      }
-
-      const activePid = config.providerId || this.getConfig().providerId;
-      if (config.apiKey !== undefined && activePid) {
-        this.saveProviderKey(activePid, config.apiKey);
       }
 
       if (config.proxyUrl !== undefined) {
@@ -252,6 +271,11 @@ class AIConfigManager {
    */
   public clearConfig(): void {
     this.inMemoryKeys.clear();
+    this.inMemoryConfig = {
+      mode: 'cvforge',
+      providerId: 'cvforge',
+      storageType: 'persistent',
+    };
 
     if (typeof window === 'undefined') return;
     try {

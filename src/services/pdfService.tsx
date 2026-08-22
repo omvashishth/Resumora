@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Resume } from '../types/resume';
 import { registerPdfFonts } from './fontRegistry';
+import { normalizeAvatarForExport } from '../utils/imageExportHelper';
 
 // Register local font assets (Inter, Roboto, Merriweather, Playfair Display, Outfit, Fira Code)
 registerPdfFonts();
@@ -17,24 +18,34 @@ export const exportResumeToPdf = async (resume: Resume): Promise<Blob> => {
   
   registerPdfFonts();
 
+  // Normalize avatar to guarantee valid PNG format supported by @react-pdf/renderer
+  const normalizedAvatar = await normalizeAvatarForExport(resume.personal?.avatarUrl);
+  const normalizedResume: Resume = {
+    ...resume,
+    personal: {
+      ...resume.personal,
+      avatarUrl: normalizedAvatar,
+    },
+  };
+
   const renderTemplate = () => {
-    switch (resume.templateId) {
+    switch (normalizedResume.templateId) {
       case 'classic':
-        return <PdfClassicTemplate resume={resume} />;
+        return <PdfClassicTemplate resume={normalizedResume} />;
       case 'modern':
-        return <PdfModernTemplate resume={resume} />;
+        return <PdfModernTemplate resume={normalizedResume} />;
       case 'minimal':
-        return <PdfMinimalTemplate resume={resume} />;
+        return <PdfMinimalTemplate resume={normalizedResume} />;
       case 'professional':
-        return <PdfProfessionalTemplate resume={resume} />;
+        return <PdfProfessionalTemplate resume={normalizedResume} />;
       case 'student':
-        return <PdfStudentTemplate resume={resume} />;
+        return <PdfStudentTemplate resume={normalizedResume} />;
       case 'executive-photo':
-        return <PdfExecutivePhotoTemplate resume={resume} />;
+        return <PdfExecutivePhotoTemplate resume={normalizedResume} />;
       case 'modern-sidebar-photo':
-        return <PdfModernSidebarPhotoTemplate resume={resume} />;
+        return <PdfModernSidebarPhotoTemplate resume={normalizedResume} />;
       default:
-        return <PdfModernTemplate resume={resume} />;
+        return <PdfModernTemplate resume={normalizedResume} />;
     }
   };
 

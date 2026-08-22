@@ -17,7 +17,10 @@ type EntitlementListener = (entitlement: AIEntitlement) => void;
 
 class EntitlementsManager {
   private listeners: Set<EntitlementListener> = new Set();
-  private defaultTotalCredits = 50;
+  private defaultTotalCredits = 10;
+  private inMemoryCredits = 10;
+  private inMemoryTotal = 10;
+  private inMemoryPlan: PlanTier = 'free';
   private isConsuming = false;
 
   constructor() {
@@ -37,13 +40,33 @@ class EntitlementsManager {
     }
   }
 
+  public resetToFree(): void {
+    this.inMemoryCredits = this.defaultTotalCredits;
+    this.inMemoryTotal = this.defaultTotalCredits;
+    this.inMemoryPlan = 'free';
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEYS.CREDITS, String(this.defaultTotalCredits));
+        localStorage.setItem(STORAGE_KEYS.TOTAL_CREDITS, String(this.defaultTotalCredits));
+        localStorage.setItem(STORAGE_KEYS.PLAN, 'free');
+      } catch {}
+    }
+    this.notify();
+  }
+
   public getEntitlement(): AIEntitlement {
     if (typeof window === 'undefined') {
+      let status: EntitlementStatus = 'TRIAL';
+      if (this.inMemoryCredits <= 0) {
+        status = 'EXHAUSTED';
+      } else if (this.inMemoryPlan === 'pro' || this.inMemoryPlan === 'unlimited') {
+        status = 'ACTIVE';
+      }
       return {
-        status: 'TRIAL',
-        plan: 'free',
-        totalCredits: 50,
-        remainingCredits: 50,
+        status,
+        plan: this.inMemoryPlan,
+        totalCredits: this.inMemoryTotal,
+        remainingCredits: Math.max(0, this.inMemoryCredits),
       };
     }
 
@@ -52,8 +75,8 @@ class EntitlementsManager {
       const totalStr = localStorage.getItem(STORAGE_KEYS.TOTAL_CREDITS);
       const planStr = (localStorage.getItem(STORAGE_KEYS.PLAN) || 'free') as PlanTier;
 
-      const remaining = remainingStr ? parseInt(remainingStr, 10) : 50;
-      const total = totalStr ? parseInt(totalStr, 10) : 50;
+      const remaining = remainingStr ? parseInt(remainingStr, 10) : this.inMemoryCredits;
+      const total = totalStr ? parseInt(totalStr, 10) : this.inMemoryTotal;
 
       let status: EntitlementStatus = 'TRIAL';
       if (remaining <= 0) {
@@ -104,10 +127,12 @@ class EntitlementsManager {
       if (entitlement.remainingCredits <= 0) return false;
 
       const newBalance = entitlement.remainingCredits - 1;
+      this.inMemoryCredits = newBalance;
+
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEYS.CREDITS, String(newBalance));
-        this.notify();
       }
+      this.notify();
       return true;
     } catch {
       return false;
@@ -117,15 +142,20 @@ class EntitlementsManager {
   }
 
   public setCredits(credits: number, total: number = 50, plan: PlanTier = 'free'): void {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.CREDITS, String(credits));
-      localStorage.setItem(STORAGE_KEYS.TOTAL_CREDITS, String(total));
-      localStorage.setItem(STORAGE_KEYS.PLAN, plan);
-      this.notify();
-    } catch (err) {
-      console.warn('Failed to save entitlement state:', err);
+    this.inMemoryCredits = credits;
+    this.inMemoryTotal = total;
+    this.inMemoryPlan = plan;
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEYS.CREDITS, String(credits));
+        localStorage.setItem(STORAGE_KEYS.TOTAL_CREDITS, String(total));
+        localStorage.setItem(STORAGE_KEYS.PLAN, plan);
+      } catch (err) {
+        console.warn('Failed to save entitlement state:', err);
+      }
     }
+    this.notify();
   }
 
   public subscribe(listener: EntitlementListener): () => void {

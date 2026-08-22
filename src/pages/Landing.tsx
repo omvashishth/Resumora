@@ -2,14 +2,17 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
 import { ImportReviewModal } from '../components/import/ImportReviewModal';
 import { AccountModal } from '../components/common/AccountModal';
+import { PaywallModal } from '../components/pricing/PaywallModal';
 import { importResumeFile } from '../services/importService';
 import type { ImportParseResult } from '../services/resumeParser';
 import type { Resume, TemplateId } from '../types/resume';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
 import { createSampleResume } from '../utils/sampleData';
+import { saveResume } from '../storage/resumeRepository';
+import { triggerResumeSync } from '../services/syncManager';
 import { ThemeToggle } from '../components/landing/ThemeToggle';
 import { ResumoraLogo } from '../components/common/ResumoraLogo';
-import { Menu, X, ArrowRight, ShieldCheck, CheckCircle2, Zap, Flame } from 'lucide-react';
+import { Menu, X, ArrowRight, ShieldCheck, CheckCircle2, Zap, Flame, Sparkles, LayoutDashboard, Crown } from 'lucide-react';
 
 interface LandingProps {
   onNavigate: (view: 'landing' | 'dashboard' | 'builder', resumeId?: string) => void;
@@ -120,6 +123,7 @@ const Interactive3DCard: React.FC<{ children: React.ReactNode; className?: strin
 
 export const Landing: React.FC<LandingProps> = ({ onNavigate, onCreateNew, onSelectResume }) => {
   const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cursorHovered, setCursorHovered] = useState<string | null>(null);
   
@@ -128,7 +132,7 @@ export const Landing: React.FC<LandingProps> = ({ onNavigate, onCreateNew, onSel
   const [importReviewOpen, setImportReviewOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Custom Smooth Cursor Tracking
   const [mousePos, setMousePos] = useState({ x: -100, y: -100 });
   const springX = useSpring(-100, { stiffness: 400, damping: 28 });
@@ -192,13 +196,25 @@ export const Landing: React.FC<LandingProps> = ({ onNavigate, onCreateNew, onSel
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Security Error: File exceeds the maximum allowed size of 5MB.");
+    if (file.size > 15 * 1024 * 1024) {
+      alert("File exceeds the maximum allowed size of 15MB.");
+      e.target.value = '';
       return;
     }
-    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!validTypes.includes(file.type) && !file.name.endsWith('.pdf') && !file.name.endsWith('.docx')) {
-      alert("Security Error: Unrecognized or malicious file signature detected.");
+
+    const fileNameLower = file.name.toLowerCase();
+    const isAllowed =
+      fileNameLower.endsWith('.pdf') ||
+      fileNameLower.endsWith('.docx') ||
+      fileNameLower.endsWith('.json') ||
+      file.type === 'application/pdf' ||
+      file.type.includes('wordprocessingml') ||
+      file.type.includes('msword') ||
+      file.type === 'application/json';
+
+    if (!isAllowed) {
+      alert("Unsupported file format. Please upload a PDF, DOCX, or JSON document.");
+      e.target.value = '';
       return;
     }
 
@@ -211,11 +227,18 @@ export const Landing: React.FC<LandingProps> = ({ onNavigate, onCreateNew, onSel
       console.error('Import error:', err);
     } finally {
       setImporting(false);
+      e.target.value = '';
     }
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = async () => {
     if (parseResult?.resume) {
+      try {
+        await saveResume(parseResult.resume);
+        triggerResumeSync(parseResult.resume.id, 'upsert');
+      } catch (e) {
+        console.warn('Could not save imported resume:', e);
+      }
       onSelectResume(parseResult.resume);
       setImportReviewOpen(false);
       onNavigate('builder', parseResult.resume.id);
@@ -295,17 +318,23 @@ export const Landing: React.FC<LandingProps> = ({ onNavigate, onCreateNew, onSel
           </div>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-7 pointer-events-auto text-white text-[13px] font-medium tracking-wide">
-          <a href="#candidates" onMouseEnter={() => setCursorHovered('VIEW')} onMouseLeave={() => setCursorHovered(null)} className="hover:opacity-75 transition-opacity">Candidates</a>
+        <nav className="hidden lg:flex items-center gap-6 pointer-events-auto text-white text-[13px] font-medium tracking-wide">
+          <button onClick={() => onNavigate('dashboard')} onMouseEnter={() => setCursorHovered('DOCS')} onMouseLeave={() => setCursorHovered(null)} className="hover:opacity-75 transition-opacity cursor-pointer">
+            My Resumes
+          </button>
           <a href="#exhibition" onMouseEnter={() => setCursorHovered('GALLERY')} onMouseLeave={() => setCursorHovered(null)} className="hover:opacity-75 transition-opacity">Templates</a>
-          <a href="#architecture" onMouseEnter={() => setCursorHovered('TECH')} onMouseLeave={() => setCursorHovered(null)} className="hover:opacity-75 transition-opacity">Architecture</a>
+          <button onClick={() => setPaywallOpen(true)} onMouseEnter={() => setCursorHovered('PRO')} onMouseLeave={() => setCursorHovered(null)} className="text-amber-400 hover:opacity-75 transition-opacity font-bold flex items-center gap-1 cursor-pointer">
+            <Sparkles className="w-3.5 h-3.5" /> Pricing
+          </button>
           <a href="#privacy" onMouseEnter={() => setCursorHovered('VAULT')} onMouseLeave={() => setCursorHovered(null)} className="hover:opacity-75 transition-opacity">Privacy</a>
           <div className="w-[1px] h-3 bg-white/30" />
           <ThemeToggle />
           <div className="w-[1px] h-3 bg-white/30" />
-          <button onClick={() => setAccountModalOpen(true)} className="hover:opacity-75 transition-opacity">Login</button>
-          <button onClick={onCreateNew} onMouseEnter={() => setCursorHovered('JOIN')} onMouseLeave={() => setCursorHovered(null)} className="font-bold hover:opacity-75 transition-opacity">
-            Join
+          <button onClick={() => setAccountModalOpen(true)} onMouseEnter={() => setCursorHovered('USER')} onMouseLeave={() => setCursorHovered(null)} className="hover:opacity-75 transition-opacity cursor-pointer">
+            Account
+          </button>
+          <button onClick={onCreateNew} onMouseEnter={() => setCursorHovered('BUILD')} onMouseLeave={() => setCursorHovered(null)} className="px-3.5 py-1.5 bg-[#F15A24] text-white rounded-full font-bold hover:bg-[#d94a18] transition-colors cursor-pointer shadow-md">
+            Build Resume →
           </button>
         </nav>
 
@@ -864,6 +893,13 @@ export const Landing: React.FC<LandingProps> = ({ onNavigate, onCreateNew, onSel
       <AccountModal
         isOpen={accountModalOpen}
         onClose={() => setAccountModalOpen(false)}
+        onOpenPaywallModal={() => setPaywallOpen(true)}
+      />
+
+      <PaywallModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        triggerReason="general_upgrade"
       />
 
     </div>

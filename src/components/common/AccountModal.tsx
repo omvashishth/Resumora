@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   CreditCard,
   Shield,
+  Printer,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -43,15 +44,26 @@ import { Select } from '../ui/Select';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { Tabs } from '../ui/Tabs';
+import { exportLimitManager, ExportEntitlementStats } from '../../services/exportLimitManager';
+import { stripeService } from '../../services/stripeService';
+import { PaymentReceiptModal, PaymentReceiptData } from '../pricing/PaymentReceiptModal';
+import { Crown } from 'lucide-react';
 
 interface AccountModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultTab?: 'account' | 'ai';
+  onOpenPaywallModal?: () => void;
 }
 
-export const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, defaultTab = 'account' }) => {
+export const AccountModal: React.FC<AccountModalProps> = ({
+  isOpen,
+  onClose,
+  defaultTab = 'account',
+  onOpenPaywallModal,
+}) => {
   const [activeTab, setActiveTab] = useState<'account' | 'ai'>(defaultTab);
+  const [exportStats, setExportStats] = useState<ExportEntitlementStats>(exportLimitManager.getStats());
 
   // Auth & Cloud state
   const [authLoading, setAuthLoading] = useState(false);
@@ -74,6 +86,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, def
   const [localResumeCount, setLocalResumeCount] = useState(0);
   const [syncingAll, setSyncingAll] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptData, setReceiptData] = useState<PaymentReceiptData | null>(null);
 
   // AI Configuration & Entitlement state
   const [aiConfig, setAIConfig] = useState<AIConfig>(aiConfigManager.getConfig());
@@ -82,6 +96,28 @@ export const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, def
   const [hasConsent, setHasConsent] = useState(consentManager.hasAIConsent());
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleOpenReceipt = () => {
+    const isPass = exportStats.plan === 'pass';
+    const isAnnual = exportStats.plan === 'annual';
+    const amount = isPass ? 149 : isAnnual ? 1499 : 249;
+
+    setReceiptData({
+      status: 'success',
+      transactionId: 'TXN_SUB_' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      invoiceNumber: `INV-${Date.now().toString().slice(-8)}`,
+      date: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+      customerName: authState.user?.user_metadata?.full_name || 'Valued Candidate',
+      customerEmail: authState.user?.email || 'candidate@resumora.app',
+      planName: isPass ? 'Job Seeker Pass (14 Days)' : isAnnual ? 'Pro Annual Membership' : 'Pro Monthly Membership',
+      planInterval: isPass ? '14 days' : isAnnual ? 'annual' : 'monthly',
+      amount: amount,
+      currency: 'INR',
+      currencySymbol: '₹',
+      paymentMethod: 'Razorpay UPI / Cards',
+    });
+    setReceiptModalOpen(true);
+  };
 
   useEffect(() => {
     setActiveTab(defaultTab);
@@ -92,6 +128,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, def
     const unsubSync = subscribeSyncStatus(setSyncStatus);
     const unsubConsent = consentManager.subscribe(setHasConsent);
     const unsubEntitlement = entitlementsManager.subscribe(setEntitlement);
+    const unsubExport = exportLimitManager.subscribe(setExportStats);
 
     getAllResumes().then((resumes) => {
       setLocalResumeCount(resumes.length);
@@ -104,6 +141,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, def
       unsubSync();
       unsubConsent();
       unsubEntitlement();
+      unsubExport();
     };
   }, []);
 
@@ -223,7 +261,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, def
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Account & System Settings" maxWidth="lg">
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} title="Account & System Settings" maxWidth="lg">
       <div className="space-y-4">
         {/* Main Tab Navigation */}
         <Tabs
@@ -477,6 +516,76 @@ export const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, def
         ) : (
           /* Cloud & Auth Tab */
           <div className="space-y-4">
+            {/* Plan & Monetization Summary Card */}
+            <Card variant="surface" className="p-3.5 border border-[var(--color-border)] bg-[var(--color-surface-raised)] space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Crown className="w-4 h-4 text-amber-500" />
+                  <span className="text-xs font-bold text-[var(--color-text-primary)]">
+                    Resumora Membership Plan
+                  </span>
+                </div>
+                <Badge variant={exportStats.isPro ? 'warning' : 'default'} className="font-mono text-[10px]">
+                  {exportStats.plan.toUpperCase()} {exportStats.isPro ? 'ACTIVE' : 'TRIAL'}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+                <div className="p-2 bg-[var(--color-surface)] rounded-[var(--radius-subtle)] border border-[var(--color-border)]">
+                  <span className="text-[10px] text-[var(--color-text-tertiary)] block uppercase">Export Quota</span>
+                  <span className="font-bold text-[var(--color-text-primary)]">
+                    {exportStats.isPro ? 'Unlimited Exports' : `${exportStats.remainingFreeExports} / 1 Free Export left`}
+                  </span>
+                </div>
+                <div className="p-2 bg-[var(--color-surface)] rounded-[var(--radius-subtle)] border border-[var(--color-border)]">
+                  <span className="text-[10px] text-[var(--color-text-tertiary)] block uppercase">AI Credits</span>
+                  <span className="font-bold text-[var(--color-brand)]">
+                    {entitlement.remainingCredits} Credits
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-1 flex gap-2">
+                {!exportStats.isPro ? (
+                  onOpenPaywallModal && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        onClose();
+                        onOpenPaywallModal();
+                      }}
+                      leftIcon={<Sparkles className="w-3.5 h-3.5" />}
+                      className="w-full font-bold"
+                    >
+                      Upgrade to Pro →
+                    </Button>
+                  )
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleOpenReceipt}
+                      leftIcon={<Printer className="w-3.5 h-3.5" />}
+                      className="w-full font-semibold"
+                    >
+                      Print Tax Invoice / Receipt
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => stripeService.openCustomerPortal()}
+                      leftIcon={<CreditCard className="w-3.5 h-3.5" />}
+                      className="w-full"
+                    >
+                      Manage Billing / Stripe
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Card>
+
             {authState.loading ? (
               <div className="py-8 flex flex-col items-center justify-center space-y-3">
                 <RefreshCw className="w-5 h-5 text-[var(--color-brand)] animate-spin" />
@@ -682,5 +791,13 @@ export const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, def
         </div>
       )}
     </Modal>
+
+    {/* Printable Payment Receipt / Tax Invoice Modal */}
+    <PaymentReceiptModal
+      isOpen={receiptModalOpen}
+      onClose={() => setReceiptModalOpen(false)}
+      receiptData={receiptData}
+    />
+    </>
   );
 };
